@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter Web (Chrome) with Firebase",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "chrome",
+      "toolArgs": [
+        "--dart-define=FIREBASE_API_KEY=AIzaSyDN4dK2BJ-7u08mWpvPZXyOp2LV9o4iIjs",
+        "--dart-define=FIREBASE_APP_ID=1:609456651624:web:1319210e2ed31748e56add",
+        "--dart-define=FIREBASE_MESSAGING_SENDER_ID=609456651624",
+        "--dart-define=FIREBASE_PROJECT_ID=movieappmain-98f9a",
+        "--dart-define=FIREBASE_AUTH_DOMAIN=movieappmain-98f9a.firebaseapp.com",
+        "--dart-define=FIREBASE_STORAGE_BUCKET=movieappmain-98f9a.firebasestorage.app",
+        "--web-port=3000"
+      ]
+    },
+    {
+      "name": "Flutter Android",
+      "request": "launch",
+      "type": "dart"
+    }
+  ]
+}
