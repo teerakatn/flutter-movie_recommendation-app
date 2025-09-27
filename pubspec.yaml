@@ -41,6 +41,7 @@ dependencies:
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
   carousel_slider: ^5.1.1
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:

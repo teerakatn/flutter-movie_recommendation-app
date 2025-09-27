@@ -223,12 +223,29 @@ class MovieCard extends StatelessWidget {
                 width: double.infinity,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: InkWell(
-                    onTap: () => onTap(item),
-                    child: CachedNetworkImage(
-                      imageUrl: item.posterUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => const _PosterSkeleton(),
+                  child: LongPressDraggable<MovieCardData>(
+                    data: item,
+                    feedback: Material(
+                      elevation: 6,
+                      borderRadius: BorderRadius.circular(8),
+                      clipBehavior: Clip.antiAlias,
+                      child: SizedBox(
+                        height: posterH * 0.6,
+                        width: (posterH * 0.6) / 1.5,
+                        child: CachedNetworkImage(
+                          imageUrl: item.posterUrl,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    childWhenDragging: const _PosterSkeleton(),
+                    child: InkWell(
+                      onTap: () => onTap(item),
+                      child: CachedNetworkImage(
+                        imageUrl: item.posterUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const _PosterSkeleton(),
+                      ),
                     ),
                   ),
                 ),

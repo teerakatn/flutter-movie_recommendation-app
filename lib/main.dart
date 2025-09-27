@@ -4,9 +4,12 @@ import 'package:http/http.dart' as http;
 import 'moviedetailpage.dart';
 import 'widgets/hero_banner.dart';
 import 'widgets/movie_row.dart';
+import 'services/favorites_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Preload favorites for instant My List
+  await FavoritesService.I.load();
   runApp(const MyApp());
 }
 
@@ -171,6 +174,58 @@ class _MovieListPageState extends State<MovieListPage> {
       appBar: AppBar(
         title: const Text('Movie App'),
         actions: [
+          // Drag-and-drop target to add to My List
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: DragTarget<MovieCardData>(
+                onWillAcceptWithDetails: (details) => true,
+                onAcceptWithDetails: (details) async {
+                  final it = details.data;
+                  await FavoritesService.I.add(it.id);
+                  if (mounted) setState(() {});
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Added "${it.title}" to My List')),
+                    );
+                  }
+                },
+                builder: (context, candidateData, rejectedData) {
+                  final isHover = candidateData.isNotEmpty;
+                  return Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isHover
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 1.4,
+                      ),
+                    ),
+                    child: IconButton(
+                      tooltip: 'My List',
+                      icon: Icon(
+                        Icons.favorite,
+                        color: isHover
+                            ? Theme.of(context).colorScheme.onPrimaryContainer
+                            : Theme.of(context).colorScheme.primary,
+                      ),
+                      onPressed: () {
+                        // Navigate to My List area by scrolling to top; here just show hint
+                        final count = FavoritesService.I.all().length;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('My List has $count item${count == 1 ? '' : 's'}')),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
           if (_isSearching)
             IconButton(
               tooltip: 'Clear search',
@@ -319,6 +374,8 @@ class _MovieListPageState extends State<MovieListPage> {
           upcoming = _fetchCategory('movie/upcoming', target: 20);
         });
         await Future.wait([popular, topRated, upcoming]);
+        // ensure favorites loaded
+        await FavoritesService.I.load();
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -326,6 +383,49 @@ class _MovieListPageState extends State<MovieListPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
+            // ===== My List row (if any) =====
+            Builder(builder: (context) {
+              final favIds = FavoritesService.I.all().toList();
+              if (favIds.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: SectionHeader(title: 'My List'),
+                  ),
+                  FutureBuilder<List<Movie>>(
+                    future: _mapFavoriteIdsToMovies(favIds),
+                    builder: (context, snapshot) {
+                      final list = snapshot.data ?? const <Movie>[];
+                      final items = list
+                          .where((m) => m.posterPath.isNotEmpty)
+                          .map((m) => MovieCardData(
+                                id: m.id,
+                                title: m.title,
+                                posterUrl: 'https://image.tmdb.org/t/p/w300${m.posterPath}',
+                              ))
+                          .toList();
+                      return MovieRow(
+                        items: items,
+                        onTap: (it) {
+                          final movie = list.firstWhere((m) => m.id == it.id, orElse: () => list.first);
+                          Navigator.push(
+                            context,
+                            PageRouteBuilder(
+                              pageBuilder: (_, a1, a2) => FadeTransition(
+                                opacity: a1,
+                                child: MovieDetailPage(movie: movie, apiKey: apiKey),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ],
+              );
+            }),
             // Hero Banner from popular movies with backdrops
             FutureBuilder<List<Movie>>(
               future: popular,
@@ -358,7 +458,7 @@ class _MovieListPageState extends State<MovieListPage> {
                           child: MovieDetailPage(movie: movie, apiKey: apiKey),
                         ),
                       ),
-                    );
+                    ).then((_) { if (mounted) setState(() {}); });
                   },
                 );
               },
@@ -388,7 +488,7 @@ class _MovieListPageState extends State<MovieListPage> {
                           child: MovieDetailPage(movie: movie, apiKey: apiKey),
                         ),
                       ),
-                    );
+                    ).then((_) { if (mounted) setState(() {}); });
                   },
                 );
               },
@@ -417,7 +517,7 @@ class _MovieListPageState extends State<MovieListPage> {
                           child: MovieDetailPage(movie: movie, apiKey: apiKey),
                         ),
                       ),
-                    );
+                    ).then((_) { if (mounted) setState(() {}); });
                   },
                 );
               },
@@ -446,7 +546,7 @@ class _MovieListPageState extends State<MovieListPage> {
                           child: MovieDetailPage(movie: movie, apiKey: apiKey),
                         ),
                       ),
-                    );
+                    ).then((_) { if (mounted) setState(() {}); });
                   },
                 );
               },
@@ -456,6 +556,40 @@ class _MovieListPageState extends State<MovieListPage> {
         ),
       ),
     );
+  }
+}
+
+extension on _MovieListPageState {
+  // Helper to fetch details for a single movie by id
+  Future<Movie?> _fetchMovieById(int id) async {
+    final url = 'https://api.themoviedb.org/3/movie/$id?api_key=$apiKey&language=en-US';
+    final res = await http.get(Uri.parse(url));
+    if (res.statusCode != 200) return null;
+    final map = json.decode(res.body) as Map<String, dynamic>;
+    return Movie.fromJson(map);
+  }
+
+  Future<List<Movie>> _mapFavoriteIdsToMovies(List<int> ids) async {
+    // Attempt to find movies within already fetched categories for fast mapping
+    List<Movie>? pop, top, up;
+    try { pop = await popular; } catch (_) {}
+    try { top = await topRated; } catch (_) {}
+    try { up = await upcoming; } catch (_) {}
+    Movie? findInCaches(int id) {
+      for (final src in [pop, top, up]) {
+        if (src == null) continue;
+        for (final m in src) {
+          if (m.id == id) return m;
+        }
+      }
+      return null;
+    }
+    final List<Movie> results = [];
+    for (final id in ids) {
+      final m = findInCaches(id) ?? await _fetchMovieById(id);
+      if (m != null) results.add(m);
+    }
+    return results;
   }
 }
 

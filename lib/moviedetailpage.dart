@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'main.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'widgets/movie_row.dart';
+import 'services/favorites_service.dart';
 
 class ExternalRatings {
   final String? imdb; // e.g., 7.8/10
@@ -53,6 +54,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     recommendations = fetchRecommendations(widget.movie.id);
     trailer = fetchTrailer(widget.movie.id);
     externalRatings = fetchExternalRatings(widget.movie.id);
+    // ensure favorites loaded
+    FavoritesService.I.load();
   }
 
   // ฟังก์ชันดึงข้อมูลแพลตฟอร์มที่สามารถดูหนังได้ (เช่น Netflix, Disney+)
@@ -376,11 +379,24 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                OutlinedButton.icon(
-                                  onPressed: () {},
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('My List'),
-                                ),
+                                Builder(builder: (context) {
+                                  final inFav = FavoritesService.I.contains(movie.id);
+                                  return OutlinedButton.icon(
+                                    onPressed: () async {
+                                      final now = await FavoritesService.I.toggle(movie.id);
+                                      if (!mounted) return;
+                                      setState(() {});
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(now ? 'Added to My List' : 'Removed from My List'),
+                                          duration: const Duration(seconds: 1),
+                                        ),
+                                      );
+                                    },
+                                    icon: Icon(inFav ? Icons.check : Icons.add),
+                                    label: Text(inFav ? 'In My List' : 'My List'),
+                                  );
+                                }),
                               ],
                             );
                           },
