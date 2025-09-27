@@ -208,7 +208,7 @@ class _MovieListPageState extends State<MovieListPage> {
                     child: IconButton(
                       tooltip: 'My List',
                       icon: Icon(
-                        Icons.favorite,
+                        Icons.bookmark_border,
                         color: isHover
                             ? Theme.of(context).colorScheme.onPrimaryContainer
                             : Theme.of(context).colorScheme.primary,
