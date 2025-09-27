@@ -5,6 +5,7 @@ import 'moviedetailpage.dart';
 import 'widgets/hero_banner.dart';
 import 'widgets/movie_row.dart';
 import 'services/favorites_service.dart';
+import 'my_list_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -184,6 +185,21 @@ class _MovieListPageState extends State<MovieListPage> {
     });
   }
 
+  void _openMyList() {
+    Navigator.of(context)
+        .push(
+          PageRouteBuilder(
+            pageBuilder: (_, a1, a2) => FadeTransition(
+              opacity: a1,
+              child: MyListPage(apiKey: apiKey),
+            ),
+          ),
+        )
+        .then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
   // Reusable category section builder (DRY)
   Widget _buildCategorySection(String title, Future<List<Movie>> future) {
     return Column(
@@ -291,13 +307,7 @@ class _MovieListPageState extends State<MovieListPage> {
                             ? Theme.of(context).colorScheme.onPrimaryContainer
                             : Theme.of(context).colorScheme.primary,
                       ),
-                      onPressed: () {
-                        // Navigate to My List area by scrolling to top; here just show hint
-                        final count = FavoritesService.I.all().length;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('My List has $count item${count == 1 ? '' : 's'}')),
-                        );
-                      },
+                      onPressed: _openMyList,
                     ),
                   );
                 },
@@ -468,9 +478,9 @@ class _MovieListPageState extends State<MovieListPage> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: SectionHeader(title: 'My List'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SectionHeader(title: 'My List', onSeeAll: _openMyList),
                   ),
                   FutureBuilder<List<Movie>>(
                     future: _mapFavoriteIdsToMovies(favIds),
