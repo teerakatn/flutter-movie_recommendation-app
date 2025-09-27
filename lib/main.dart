@@ -200,10 +200,6 @@ class _MovieListPageState extends State<MovieListPage> {
                       color: isHover
                           ? Theme.of(context).colorScheme.primaryContainer
                           : Colors.transparent,
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.primary,
-                        width: 1.4,
-                      ),
                     ),
                     child: IconButton(
                       tooltip: 'My List',
