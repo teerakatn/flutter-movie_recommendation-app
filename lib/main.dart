@@ -168,6 +168,88 @@ class _MovieListPageState extends State<MovieListPage> {
     super.dispose();
   }
 
+  // Navigation helper (DRY)
+  void _openMovieDetails(Movie movie) {
+    Navigator.of(context)
+        .push(
+          PageRouteBuilder(
+            pageBuilder: (_, a1, a2) => FadeTransition(
+              opacity: a1,
+              child: MovieDetailPage(movie: movie, apiKey: apiKey),
+            ),
+          ),
+        )
+        .then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  // Reusable category section builder (DRY)
+  Widget _buildCategorySection(String title, Future<List<Movie>> future) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SectionHeader(title: title),
+        ),
+        FutureBuilder<List<Movie>>(
+          future: future,
+          builder: (context, snapshot) {
+            final list = snapshot.data ?? const <Movie>[];
+            final items = list
+                .where((m) => m.posterPath.isNotEmpty)
+                .map((m) => MovieCardData(
+                      id: m.id,
+                      title: m.title,
+                      posterUrl: 'https://image.tmdb.org/t/p/w300${m.posterPath}',
+                    ))
+                .toList();
+            return MovieRow(
+              items: items,
+              onTap: (it) {
+                final movie = list.firstWhere((m) => m.id == it.id, orElse: () => list.first);
+                _openMovieDetails(movie);
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // Helper to fetch details for a single movie by id
+  Future<Movie?> _fetchMovieById(int id) async {
+    final url = 'https://api.themoviedb.org/3/movie/$id?api_key=$apiKey&language=en-US';
+    final res = await http.get(Uri.parse(url));
+    if (res.statusCode != 200) return null;
+    final map = json.decode(res.body) as Map<String, dynamic>;
+    return Movie.fromJson(map);
+  }
+
+  Future<List<Movie>> _mapFavoriteIdsToMovies(List<int> ids) async {
+    // Attempt to find movies within already fetched categories for fast mapping
+    List<Movie>? pop, top, up;
+    try { pop = await popular; } catch (_) {}
+    try { top = await topRated; } catch (_) {}
+    try { up = await upcoming; } catch (_) {}
+    Movie? findInCaches(int id) {
+      for (final src in [pop, top, up]) {
+        if (src == null) continue;
+        for (final m in src) {
+          if (m.id == id) return m;
+        }
+      }
+      return null;
+    }
+    final List<Movie> results = [];
+    for (final id in ids) {
+      final m = findInCaches(id) ?? await _fetchMovieById(id);
+      if (m != null) results.add(m);
+    }
+    return results;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -447,145 +529,20 @@ class _MovieListPageState extends State<MovieListPage> {
                   items: items,
                   onTap: (i) {
                     final movie = snapshot.data!.firstWhere((m) => m.id == i.id, orElse: () => snapshot.data!.first);
-                    Navigator.of(context).push(
-                      PageRouteBuilder(
-                        pageBuilder: (_, a1, a2) => FadeTransition(
-                          opacity: a1,
-                          child: MovieDetailPage(movie: movie, apiKey: apiKey),
-                        ),
-                      ),
-                    ).then((_) { if (mounted) setState(() {}); });
+                    _openMovieDetails(movie);
                   },
                 );
               },
             ),
             const SizedBox(height: 8),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: SectionHeader(title: 'Popular'),
-            ),
-            FutureBuilder<List<Movie>>(
-              future: popular,
-              builder: (context, snapshot) {
-                final list = snapshot.data ?? const <Movie>[];
-                final items = list
-                    .where((m) => m.posterPath.isNotEmpty)
-                    .map((m) => MovieCardData(id: m.id, title: m.title, posterUrl: 'https://image.tmdb.org/t/p/w300${m.posterPath}'))
-                    .toList();
-                return MovieRow(
-                  items: items,
-                  onTap: (it) {
-                    final movie = list.firstWhere((m) => m.id == it.id, orElse: () => list.first);
-                    Navigator.push(
-                      context,
-                      PageRouteBuilder(
-                        pageBuilder: (_, a1, a2) => FadeTransition(
-                          opacity: a1,
-                          child: MovieDetailPage(movie: movie, apiKey: apiKey),
-                        ),
-                      ),
-                    ).then((_) { if (mounted) setState(() {}); });
-                  },
-                );
-              },
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: SectionHeader(title: 'Top Rated'),
-            ),
-            FutureBuilder<List<Movie>>(
-              future: topRated,
-              builder: (context, snapshot) {
-                final list = snapshot.data ?? const <Movie>[];
-                final items = list
-                    .where((m) => m.posterPath.isNotEmpty)
-                    .map((m) => MovieCardData(id: m.id, title: m.title, posterUrl: 'https://image.tmdb.org/t/p/w300${m.posterPath}'))
-                    .toList();
-                return MovieRow(
-                  items: items,
-                  onTap: (it) {
-                    final movie = list.firstWhere((m) => m.id == it.id, orElse: () => list.first);
-                    Navigator.push(
-                      context,
-                      PageRouteBuilder(
-                        pageBuilder: (_, a1, a2) => FadeTransition(
-                          opacity: a1,
-                          child: MovieDetailPage(movie: movie, apiKey: apiKey),
-                        ),
-                      ),
-                    ).then((_) { if (mounted) setState(() {}); });
-                  },
-                );
-              },
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: SectionHeader(title: 'Upcoming'),
-            ),
-            FutureBuilder<List<Movie>>(
-              future: upcoming,
-              builder: (context, snapshot) {
-                final list = snapshot.data ?? const <Movie>[];
-                final items = list
-                    .where((m) => m.posterPath.isNotEmpty)
-                    .map((m) => MovieCardData(id: m.id, title: m.title, posterUrl: 'https://image.tmdb.org/t/p/w300${m.posterPath}'))
-                    .toList();
-                return MovieRow(
-                  items: items,
-                  onTap: (it) {
-                    final movie = list.firstWhere((m) => m.id == it.id, orElse: () => list.first);
-                    Navigator.push(
-                      context,
-                      PageRouteBuilder(
-                        pageBuilder: (_, a1, a2) => FadeTransition(
-                          opacity: a1,
-                          child: MovieDetailPage(movie: movie, apiKey: apiKey),
-                        ),
-                      ),
-                    ).then((_) { if (mounted) setState(() {}); });
-                  },
-                );
-              },
-            ),
+            _buildCategorySection('Popular', popular),
+            _buildCategorySection('Top Rated', topRated),
+            _buildCategorySection('Upcoming', upcoming),
             const SizedBox(height: 24),
           ],
         ),
       ),
     );
-  }
-}
-
-extension on _MovieListPageState {
-  // Helper to fetch details for a single movie by id
-  Future<Movie?> _fetchMovieById(int id) async {
-    final url = 'https://api.themoviedb.org/3/movie/$id?api_key=$apiKey&language=en-US';
-    final res = await http.get(Uri.parse(url));
-    if (res.statusCode != 200) return null;
-    final map = json.decode(res.body) as Map<String, dynamic>;
-    return Movie.fromJson(map);
-  }
-
-  Future<List<Movie>> _mapFavoriteIdsToMovies(List<int> ids) async {
-    // Attempt to find movies within already fetched categories for fast mapping
-    List<Movie>? pop, top, up;
-    try { pop = await popular; } catch (_) {}
-    try { top = await topRated; } catch (_) {}
-    try { up = await upcoming; } catch (_) {}
-    Movie? findInCaches(int id) {
-      for (final src in [pop, top, up]) {
-        if (src == null) continue;
-        for (final m in src) {
-          if (m.id == id) return m;
-        }
-      }
-      return null;
-    }
-    final List<Movie> results = [];
-    for (final id in ids) {
-      final m = findInCaches(id) ?? await _fetchMovieById(id);
-      if (m != null) results.add(m);
-    }
-    return results;
   }
 }
 
